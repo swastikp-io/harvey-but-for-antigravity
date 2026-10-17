@@ -1,10 +1,10 @@
 # Harvey
 
-**An autonomous sales agent that runs on your Google Antigravity (`agy`), Claude Code, or Codex subscription.**
+**An autonomous sales agent built for Google Antigravity (`agy`).**
 
 Harvey finds businesses worth selling to, learns something specific about each one, writes cold email that references it, sends it, reads the replies, and works the conversation toward a meeting. It runs on your machine, in a loop, on its own.
 
-The unusual part: **there is no model API bill.** Harvey uses your Google Antigravity (`agy`) / Gemini quota, your Claude Pro or Max subscription through Claude Code, or your ChatGPT subscription through Codex. Model calls use the plan you already pay for, without an API key or per-token API billing. Antigravity is the primary environment; Claude and Codex remain available alternatives.
+The unusual part: **there is no model API bill.** Harvey uses your Google Antigravity (`agy`) / Gemini quota. Model calls run directly through your existing Antigravity environment, without an API key or per-token API billing.
 
 ```
 $ harvey run
@@ -48,7 +48,6 @@ anything, and approving mail one message at a time:
 - [How the data is stored](#how-the-data-is-stored)
 - [Configuration](#configuration)
 - [Using Google Antigravity (`agy`)](#using-google-antigravity-agy)
-- [Using a ChatGPT plan instead (Codex)](#using-a-chatgpt-plan-instead-codex)
 - [Legal and deliverability](#legal-and-deliverability)
 - [Troubleshooting](#troubleshooting)
 - [Project structure](#project-structure)
@@ -61,26 +60,23 @@ anything, and approving mail one message at a time:
 
 Every other autonomous sales agent bills you per token. That is the whole reason they cost what they cost: an agent that thinks in a loop, all day, is an agent that burns API credits in a loop, all day. Vendors solve this by thinking less — shorter prompts, cheaper models, fewer passes.
 
-Harvey uses the subscription-backed CLI for your chosen provider:
-- **`antigravity`** — invokes Google Antigravity's `agy` CLI in headless mode (`agy -p`), leveraging Gemini models and your existing quota without per-token charges.
-- **`claude`** — invokes Claude Code CLI (`claude -p`).
-- **`codex`** — invokes Codex CLI app-server for ChatGPT Plus/Pro/Business plans.
+Harvey invokes Google Antigravity's `agy` CLI in headless mode (`agy -p`), leveraging Gemini models and your existing Antigravity quota without per-token charges.
 
-All providers run with model tools disabled. Harvey handles the web discovery, HTTP profiling, SQLite updates, and email operations natively in Python.
+Antigravity runs with external tools disabled so Harvey handles web discovery, HTTP profiling, SQLite updates, and email operations natively in Python.
 
 **What this costs you:**
 
 | | |
 |---|---|
-| Google Antigravity (`agy`) / Gemini, Claude, or ChatGPT | your existing subscription / quota |
+| Google Antigravity (`agy`) / Gemini | your existing Antigravity environment & quota |
 | Finding businesses | **$0** on the default source, or ~$0.37 per 1,000 on the cheapest paid one |
 | Reading their websites | **$0** — three HTTP requests each, no model call |
-| Writing and sending | your subscription + a mailbox (~$7/mo Google Workspace) |
+| Writing and sending | your Antigravity environment + a mailbox (~$7/mo Google Workspace) |
 | Prospecting tools | **none.** No Apollo, no ZoomInfo, no Clearbit, no Clay. |
 
 For comparison, the tools Harvey replaces start at $250–500/month — and they are weakest precisely where Harvey is strongest: small local businesses with 5–50 people, where single-provider contact coverage caps out around 30% and micro-businesses are frequently absent entirely.
 
-**Harvey also budgets itself.** It checks the active provider's quota and throttles to leave headroom for your interactive coding work. Set `max_daily_claude_percent: 80` (or `max_daily_provider_percent: 80`). If quota cannot be read directly from the CLI, Harvey safely falls back to its daily call budget.
+**Harvey also budgets itself.** It checks Antigravity's quota and throttles to leave headroom for your interactive coding work. Set `max_daily_provider_percent: 80` in `harvey.yaml`. If quota cannot be read directly from the CLI, Harvey safely falls back to its daily call budget.
 
 ---
 
@@ -122,7 +118,7 @@ Profiling and outbox draining ride along on **every** cycle regardless, because 
 ### Prerequisites
 
 - **Python 3.11+** — verify with `python --version` or `python3 --version`.
-- An active **Google Antigravity (`agy`) / Gemini** session, **Claude Pro/Max** subscription (`claude login`), or **ChatGPT plan with Codex CLI**.
+- An active **Google Antigravity (`agy`)** environment with Gemini.
 - A mailbox to send from — Gmail/Google Workspace recommended on a *dedicated secondary domain*. Microsoft 365 and SMTP/IMAP work too.
 
 ### Easiest: let Antigravity set it up
@@ -376,9 +372,9 @@ icp:          { industries, titles, company_size, geography, hiring_signals, geo
 channels:
   email:      { provider: gmail | microsoft | smtp | instantly, max_daily_sends, require_approval,
                 send_to_risky, max_bounce_rate }
-usage:        { max_daily_claude_percent, heartbeat_interval_minutes, quiet_hours }
+usage:        { max_daily_provider_percent, heartbeat_interval_minutes, quiet_hours }
 brain:
-  provider: antigravity     # antigravity (default in agy) | claude | codex
+  provider: antigravity     # Google Antigravity ('agy')
   model: gemini-2.5-pro     # optional: gemini-2.5-pro | gemini-2.5-flash
 ```
 
@@ -395,25 +391,12 @@ brain:
 ```
 
 1. **Headless Execution**: Calls `agy -p` with zero external tools enabled, enforcing tool-isolation while letting Gemini power the reasoning.
-2. **Quota Awareness**: Respects `max_daily_claude_percent` against Antigravity credit limits, automatically falling back to daily call accounting if quota gauges are inaccessible.
+2. **Quota Awareness**: Respects `max_daily_provider_percent` against Antigravity quota limits, automatically falling back to daily call accounting if quota gauges are inaccessible.
 3. **Slash Commands & Agents**: Use `/harvey-setup`, `/harvey-discover`, and `/harvey-outbox`, plus subagents `harvey-scout`, `harvey-writer`, and `harvey-closer`.
 4. **Readiness Check**: Verify provider status with:
    ```bash
    harvey status --check
    ```
-
----
-
-## Using a ChatGPT plan instead (Codex)
-
-To use a ChatGPT subscription (Plus, Pro, Business) on macOS or Linux:
-
-```bash
-npm install -g @openai/codex@0.159.3
-codex login                            # "Sign in with ChatGPT"
-```
-
-Configure `brain.provider: codex` and `brain.model: gpt-5.5` in `harvey.yaml`. Harvey runs Codex in an isolated temporary environment with tools disabled.
 
 ---
 
@@ -443,9 +426,8 @@ Harvey automates outreach, but **you are the sender.**
 ```
 harvey/
 ├── main.py              # heartbeat loop
-├── brain.py             # Provider orchestration (Antigravity, Claude, Codex)
+├── brain.py             # Provider orchestration & Antigravity bridge
 ├── antigravity.py       # Google Antigravity (agy) headless CLI provider
-├── codex.py             # Isolated Codex subscription runtime
 ├── state.py             # SQLite schema, observations, cohorts, outbox
 ├── signals.py           # 23-signal catalog
 ├── pipeline.py          # DISCOVER → PROFILE chaining
