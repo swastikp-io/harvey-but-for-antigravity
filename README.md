@@ -2,6 +2,8 @@
 
 **An autonomous sales agent built for Google Antigravity (`agy`).**
 
+> 📖 **Complete Setup Guide:** [Harvey but for Antigravity Setup Guide](https://four-grenadilla-f40.notion.site/Harvey-but-for-Antigravity-Setup-Guide-3cdcb488caf68014a62dc4be4a1e9302)
+
 Harvey finds businesses worth selling to, learns something specific about each one, writes cold email that references it, sends it, reads the replies, and works the conversation toward a meeting. It runs on your machine, in a loop, on its own.
 
 The unusual part: **there is no model API bill.** Harvey uses your Google Antigravity (`agy`) / Gemini quota. Model calls run directly through your existing Antigravity environment, without an API key or per-token API billing.
@@ -114,6 +116,8 @@ Profiling and outbox draining ride along on **every** cycle regardless, because 
 ---
 
 ## Quick start
+
+> 📖 **Full Walkthrough:** See the [Complete Harvey Setup Guide](https://four-grenadilla-f40.notion.site/Harvey-but-for-Antigravity-Setup-Guide-3cdcb488caf68014a62dc4be4a1e9302) on Notion for an in-depth walkthrough from zero to launch.
 
 ### Prerequisites
 
