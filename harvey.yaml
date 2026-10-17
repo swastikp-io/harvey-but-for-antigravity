@@ -58,12 +58,17 @@ channels:
     max_daily_messages: 10
 
 usage:
+  max_daily_provider_percent: 80
   max_daily_claude_percent: 80
   heartbeat_interval_minutes: 15
   quiet_hours:
     start: "22:00"
     end: "07:00"
     timezone: "America/New_York"
+
+brain:
+  provider: "antigravity"          # antigravity (recommended) | claude | codex
+  model: ""                        # empty = provider default (e.g. Gemini 3.8 Flash)
 
 # Optional: check each new recipient with Precleared (precleared.dev) before
 # the first cold email: may cold marketing email go to this address under UK

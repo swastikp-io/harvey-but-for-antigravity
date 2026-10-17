@@ -23,7 +23,13 @@ linkedin_cookies.json
 skills/product_knowledge.md
 
 # Local agent tooling
-.agents/
+.agents/*
+!.agents/rules/
+!.agents/rules/**
+!.agents/skills/
+!.agents/skills/**
+!.agents/subagents/
+!.agents/subagents/**
 AGENTS.md
 
 # IDE

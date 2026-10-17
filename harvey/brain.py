@@ -39,7 +39,7 @@ _NON_RETRYABLE_PATTERNS = (
 )
 
 
-PROVIDER_LABELS = {"claude": "Claude", "codex": "Codex"}
+PROVIDER_LABELS = {"claude": "Claude", "codex": "Codex", "antigravity": "Antigravity"}
 
 # Settings key holding the brain's last health transition, for `harvey
 # status` and the dashboard: {"provider", "status": "ok"|"paused", "reason",
@@ -88,7 +88,8 @@ class Brain:
         self.provider = self.config.provider
         self.model = self.config.model
         self.codex = None
-        # Codex health (unused for Claude, whose behaviour is unchanged).
+        self.antigravity = None
+        # Provider health status (for Codex and Antigravity).
         self.unavailable = ""
         self._unavailable_at = 0.0
         self._unavailable_fingerprint = None
@@ -101,6 +102,10 @@ class Brain:
                 model=self.model, reasoning_effort=self.config.reasoning_effort
             )
             self.quota = CodexQuotaClient(self.codex)
+        elif self.provider == "antigravity":
+            from harvey.antigravity import AntigravityProvider, AntigravityQuotaClient
+            self.antigravity = AntigravityProvider(model=self.model)
+            self.quota = AntigravityQuotaClient(self.antigravity)
         else:
             # Lazy import avoids a cycle (quota -> usage -> state).
             from harvey.integrations.quota import QuotaClient
@@ -122,17 +127,38 @@ class Brain:
     async def preflight(self) -> str:
         """Can this Brain be used right now? Returns "" or the reason not.
 
-        Codex only (Claude keeps its existing behaviour): runs the adapter's
-        full pre-prompt check (CodexClient.preflight): CLI version, route and
-        lockdown attested with no login in the runtime, the native login read
-        only (expiry, renewal), then with the access-only copy the configured
-        model against the catalog, the ChatGPT account, and a started
-        tool-less thread. No turn, so no inference; nothing is written to the
-        native login. While paused, the check is repeated only when the login
-        file or the Codex executable changes, or every
-        PROVIDER_RECHECK_SECONDS, so a persistent problem doesn't start
-        runtimes every heartbeat.
+        Checks provider readiness:
+        - Antigravity: checks CLI presence, preflight check, and tool isolation.
+        - Codex: checks CLI version, lockdown, native login, model catalog, and thread.
+        - Claude: keeps existing behaviour (checked on first call).
         """
+        if self.provider == "antigravity":
+            from harvey.antigravity import AntigravityError
+
+            await self._expire_usage_pause()
+            if self.unavailable:
+                unchanged = self.antigravity.fingerprint() == self._unavailable_fingerprint
+                recent = time.monotonic() - self._unavailable_at < PROVIDER_RECHECK_SECONDS
+                if unchanged and recent:
+                    return self.unavailable
+            try:
+                await self.antigravity.preflight()
+            except AntigravityError as e:
+                if e.kind in ("setup", "auth", "isolation"):
+                    await self._mark_unavailable(e)
+                    return self.unavailable
+                return str(e)
+            except Exception as e:
+                return f"Antigravity preflight failed unexpectedly ({type(e).__name__})."
+            if self.unavailable:
+                await self._mark_available()
+            elif not self._status_synced:
+                logger.info(
+                    f"Antigravity ready: agy CLI and isolation verified, "
+                    f"model {self.model or 'auto'} usable with no tools.")
+                self._status_synced = True
+            return ""
+
         if self.provider != "codex":
             return ""
         from harvey.codex import CodexError
@@ -197,7 +223,10 @@ class Brain:
         first = not self.unavailable or self.unavailable != str(error)
         self.unavailable = str(error)
         self._unavailable_at = time.monotonic()
-        self._unavailable_fingerprint = self.codex.fingerprint()
+        if self.provider == "codex" and self.codex:
+            self._unavailable_fingerprint = self.codex.fingerprint()
+        elif self.provider == "antigravity" and self.antigravity:
+            self._unavailable_fingerprint = self.antigravity.fingerprint()
         if first:
             await self._record_status("paused", self.unavailable,
                                       kind=getattr(error, "kind", ""))
@@ -239,6 +268,11 @@ class Brain:
         """
         if self.provider == "codex":
             return await self._think_codex(
+                prompt, session_id=session_id, timeout=timeout,
+                max_retries=max_retries, agent=agent, task=task,
+            )
+        if self.provider == "antigravity":
+            return await self._think_antigravity(
                 prompt, session_id=session_id, timeout=timeout,
                 max_retries=max_retries, agent=agent, task=task,
             )
@@ -458,6 +492,93 @@ class Brain:
             **result.usage,
         )
 
+    async def _think_antigravity(
+        self,
+        prompt: str,
+        session_id: str | None,
+        timeout: float,
+        max_retries: int,
+        agent: str,
+        task: str,
+    ) -> str:
+        """One isolated Antigravity turn per attempt (see harvey/antigravity.py)."""
+        from harvey.antigravity import AntigravityError
+
+        paused = self.paused_reason
+        if paused:
+            logger.debug(f"Antigravity call skipped: {paused}")
+            return ""
+        logger.debug(f"Brain call via Antigravity (label={session_id})")
+        last_error = ""
+        for attempt in range(max_retries + 1):
+            if attempt > 0:
+                delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                logger.info(
+                    f"Retrying Antigravity call in {delay:.0f}s "
+                    f"(attempt {attempt + 1}/{max_retries + 1})..."
+                )
+                await asyncio.sleep(delay)
+            try:
+                result = await self.antigravity.run(
+                    prompt, timeout=timeout, session_id=session_id,
+                    skip_if=lambda: self.paused_reason,
+                )
+            except AntigravityError as e:
+                if e.kind == "paused":
+                    logger.debug(f"Antigravity call skipped: {e}")
+                    return ""
+                last_error = str(e)
+                if e.retryable:
+                    logger.warning(f"Antigravity call failed: {e}")
+                    continue
+                logger.error(f"Antigravity call failed: {e}")
+                if e.kind in ("setup", "auth", "isolation"):
+                    await self._mark_unavailable(e)
+                elif e.kind == "usage_limit":
+                    await self._start_usage_pause()
+                    invalidate = getattr(self.quota, "invalidate", None)
+                    if invalidate:
+                        invalidate()
+                return ""
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"Antigravity call failed unexpectedly ({type(e).__name__}).")
+                return ""
+
+            try:
+                await self.state.increment_usage(provider="antigravity")
+            except Exception as e:
+                logger.warning(f"Failed to record usage counter: {e}")
+            try:
+                await self._record_antigravity_usage(result, agent=agent, task=task,
+                                                     label=session_id or "")
+            except Exception as e:
+                logger.warning(f"Failed to record usage event: {e}")
+            return result.text
+
+        logger.error(
+            f"Antigravity call failed after {max_retries + 1} attempts. "
+            f"Last error: {last_error[:200]}"
+        )
+        return ""
+
+    async def _record_antigravity_usage(self, result, agent: str, task: str, label: str):
+        """One usage row per Antigravity call."""
+        if not agent and label.startswith("harvey-"):
+            agent = label[len("harvey-"):].split("-")[0]
+        await self.state.record_usage_event(
+            agent=agent,
+            task=task or label,
+            session_id=result.session_id,
+            model=result.model or self.model or "antigravity",
+            duration_ms=result.duration_ms,
+            num_turns=1,
+            source="agy_cli",
+            provider="antigravity",
+            **result.usage,
+        )
+
     @staticmethod
     def _parse_result_payload(raw: str) -> tuple[str, dict | None]:
         """Split CLI JSON output into (response_text, result_payload).
@@ -652,16 +773,28 @@ class Brain:
         return template
 
     def load_skill(self, skill_name: str) -> str:
-        """Load a skill knowledge file from the skills/ directory."""
-        skill_file = SKILLS_DIR / f"{skill_name}.md"
-        try:
-            return skill_file.read_text()
-        except FileNotFoundError:
-            logger.warning(f"Skill file not found: {skill_file}")
-            return ""
-        except OSError as e:
-            logger.error(f"Could not read skill file {skill_file}: {e}")
-            return ""
+        """Load a skill knowledge file from .agents/skills/ or skills/ directory.
+
+        Strips YAML frontmatter if present so prompt injection receives clean markdown.
+        """
+        candidates = [
+            PROJECT_ROOT / ".agents" / "skills" / skill_name / "SKILL.md",
+            PROJECT_ROOT / ".agents" / "skills" / skill_name.replace("_", "-") / "SKILL.md",
+            SKILLS_DIR / f"{skill_name}.md",
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                try:
+                    content = candidate.read_text(encoding="utf-8")
+                    if content.startswith("---"):
+                        content = re.sub(r"^---\r?\n.*?\r?\n---\r?\n+", "", content, flags=re.DOTALL)
+                    return content
+                except OSError as e:
+                    logger.error(f"Could not read skill file {candidate}: {e}")
+                    return ""
+
+        logger.warning(f"Skill file not found for: {skill_name}")
+        return ""
 
     def load_skills_for_agent(self, agent_name: str) -> str:
         """Load all relevant skills for a specific sub-agent.

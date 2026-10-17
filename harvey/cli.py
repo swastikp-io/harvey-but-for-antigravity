@@ -199,6 +199,7 @@ def cmd_status(args):
         by_provider = summary.get("usage_today_by_provider", {})
         print(f"  Claude calls today:   {by_provider.get('claude', summary['usage_today'])}")
         print(f"  Codex calls today:    {by_provider.get('codex', 0)}")
+        print(f"  Antigravity calls today: {by_provider.get('antigravity', 0)}")
         from harvey.brain import BRAIN_STATUS_KEY, Brain, active_brain_status
         from harvey.config import ConfigError, load_brain_config
         try:
@@ -226,11 +227,16 @@ def cmd_status(args):
                 elif brain.provider == "codex":
                     print(f"  Brain:                {label} ready (CLI, isolation, login, "
                           "model and account checked; no prompt sent)")
+                elif brain.provider == "antigravity":
+                    print(f"  Brain:                {label} ready (agy CLI and isolation checked; "
+                          "no prompt sent)")
                 else:
                     print(f"  Brain:                {label} (not checked: Claude is checked "
                           "by its first call)")
         elif brain_status.get("status") == "paused":
-            label = {"claude": "Claude", "codex": "Codex"}.get(brain_status.get("provider"), "Brain")
+            label = {"claude": "Claude", "codex": "Codex", "antigravity": "Antigravity"}.get(
+                brain_status.get("provider"), "Brain"
+            )
             print(f"  Brain:                {label} PAUSED since {brain_status.get('since', '?')}")
             print(f"                        {brain_status.get('reason', '')}")
         print()
@@ -266,17 +272,22 @@ def cmd_usage(args):
                 from harvey.codex import CodexClient, CodexQuotaClient
                 windows = await CodexQuotaClient(
                     CodexClient(model=brain_config.model)).get_utilization()
+            elif provider == "antigravity":
+                from harvey.antigravity import AntigravityProvider, AntigravityQuotaClient
+                windows = await AntigravityQuotaClient(
+                    AntigravityProvider(model=brain_config.model)).get_utilization()
             elif provider == "claude":
                 from harvey.integrations.quota import QuotaClient
                 windows = await QuotaClient().get_utilization()
         except Exception:
             pass
 
-        label = {"claude": "Claude", "codex": "Codex"}.get(provider, "Brain")
+        label = {"claude": "Claude", "codex": "Codex", "antigravity": "Antigravity"}.get(provider, "Brain")
         print(f"\n  {label} Usage")
         print("  " + "=" * 52)
         if windows:
             labels = {"five_hour": "5-hour window", "seven_day": "Weekly",
+                      "credits": "Credit utilization", "daily": "Daily limit",
                       "limit_reached": "Usage limit"}
             for key, w in windows.items():
                 resets = f"  (resets {w['resets_at']})" if w.get("resets_at") else ""
@@ -284,6 +295,9 @@ def cmd_usage(args):
         elif provider == "codex":
             print("  Quota gauge unavailable (check 'codex login', the Codex CLI "
                   "version, and network).")
+        elif provider == "antigravity":
+            print("  Quota gauge unavailable (check 'agy login', agy installation, "
+                  "and network).")
         elif provider == "claude":
             print("  Quota gauge unavailable (run 'claude login' or check network).")
 
@@ -447,7 +461,7 @@ def cmd_outbox(args):
         print("  " + "=" * 60)
         for item in pending:
             print(f"\n  [{item['id']}] step {item['step']} ({item['kind']}) "
-                  f"→ {item['to_email']}  (send {item['send_at'][:16]})")
+                  f"-> {item['to_email']}  (send {item['send_at'][:16]})")
             print(f"  Subject: {item['subject']}")
             body_preview = (item["body"][:200] + "...") if len(item["body"]) > 200 else item["body"]
             for line in body_preview.splitlines():
@@ -480,8 +494,8 @@ def cmd_profile(args):
               f"{args.limit}...\n")
         companies, observations, _ = await run_profile_stage(
             state, limit=args.limit, stale_days=args.stale_days)
-        print(f"  Read {companies} sites → {observations} observations (free)")
-        print("\n  See what turned up: harvey dashboard → Signals\n")
+        print(f"  Read {companies} sites -> {observations} observations (free)")
+        print("\n  See what turned up: harvey dashboard -> Signals\n")
 
     asyncio.run(_profile())
 
@@ -566,7 +580,7 @@ def cmd_discover(args):
 
         for err in result.errors[:5]:
             print(f"    ! {err}")
-        print("\n  Next: harvey dashboard → Signals → cohort builder\n")
+        print("\n  Next: harvey dashboard -> Signals -> cohort builder\n")
 
     asyncio.run(_discover())
 
@@ -609,7 +623,7 @@ def cmd_signals(args):
         for r in rows:
             by_status[r["status"]] = by_status.get(r["status"], 0) + 1
 
-        print(f"\n  Signals — {by_status['confirmed']} confirmed, "
+        print(f"\n  Signals -- {by_status['confirmed']} confirmed, "
               f"{by_status['proposed']} awaiting you, {by_status['rejected']} off")
         print("  " + "=" * 66)
         mark = {"confirmed": "[on] ", "proposed": "[ ? ]", "rejected": "[off]"}
@@ -627,7 +641,7 @@ def cmd_signals(args):
         if by_status["proposed"]:
             print("\n  Confirm with: harvey signals --confirm CODE[,CODE...]")
             print("  Everything free: harvey signals --confirm free")
-            print("  Details and descriptions: harvey dashboard → Signals\n")
+            print("  Details and descriptions: harvey dashboard -> Signals\n")
         else:
             print("")
 
@@ -656,6 +670,17 @@ def cmd_sending(args):
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    if hasattr(sys.stderr, "reconfigure"):
+        try:
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     from harvey.paths import PROJECT_ROOT
     project_root = str(PROJECT_ROOT)
 
@@ -688,7 +713,7 @@ def main():
         help="Max pages to crawl (default: 100)",
     )
     sub.add_argument(
-        "--provider", choices=["claude", "codex"], default=None,
+        "--provider", choices=["claude", "codex", "antigravity"], default=None,
         help="Subscription to think with (default: the one in your config, else claude)",
     )
     sub.add_argument("--model", default=None, help="Model for this provider (default: provider default)")

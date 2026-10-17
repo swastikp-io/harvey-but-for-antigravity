@@ -105,6 +105,56 @@ The order of impact is: **deliverability > list quality/relevance > copy.**
 A perfect email to an unverified address at a warmed-wrong domain gets zero
 replies. Copy is the last 20%.
 
+---
+
+## The 5 Core Frameworks
+
+Select the framework based on the prospect's seniority, context, and available signal.
+
+### 1. AIDA (Attention, Interest, Desire, Action)
+- **Best for:** Broad ICP outreach with clear value propositions and tangible case studies.
+- **Structure:**
+  - *Attention:* Grounded observation or trigger event.
+  - *Interest:* A metric or problem common to their specific role.
+  - *Desire:* Low-friction insight or proof of how peers solved it.
+  - *Action:* Soft offer CTA or low-commitment question.
+- **Selection rule:** Use when you have a solid company observation and a strong proof metric.
+
+### 2. PAS (Problem, Agitate, Solution)
+- **Best for:** Technical leaders, operations, or founders experiencing known operational friction.
+- **Structure:**
+  - *Problem:* State the specific inefficiency plainly (e.g. manual reports, missed calls).
+  - *Agitate:* The cost or time drain of leaving it unsolved (1 sentence, no melodrama).
+  - *Solution:* How you remove that friction without switching systems.
+  - *Action:* Single direct question ("worth exploring or already solved?").
+- **Selection rule:** Use when targeting roles with acute operational bottlenecks.
+
+### 3. BAB (Before, After, Bridge)
+- **Best for:** Mid-funnel follow-ups or prospects using legacy workflows.
+- **Structure:**
+  - *Before:* The current cumbersome status quo.
+  - *After:* The streamlined future state (time saved, automatic sync).
+  - *Bridge:* The simple path to get there.
+- **Selection rule:** Use for Email 2 follow-ups to contrast current drag with automated ease.
+
+### 4. QVC (Question, Value, CTA)
+- **Best for:** Ultra-short outreach (<50 words), C-suite, and mobile readers.
+- **Structure:**
+  - *Question:* Direct, thought-provoking question tied to their current setup.
+  - *Value:* One sentence on how you solve that exact point.
+  - *CTA:* Binary easy-yes ask ("open to seeing how?").
+- **Selection rule:** Use when emailing busy executives who review emails on their phones.
+
+### 5. 3Ps (Praise, Picture, Push)
+- **Best for:** Outreach based on verifiable achievements, public launches, or notable company news.
+- **Structure:**
+  - *Praise:* Genuine, specific acknowledgment of a real milestone (not empty flattery).
+  - *Picture:* A brief picture of tackling the scaling challenge that follows that milestone.
+  - *Push:* A low-key invitation to chat.
+- **Selection rule:** Use only when a genuine, verifiable public trigger exists (e.g., funding, product release).
+
+---
+
 ## The 3-Email Sequence
 
 ### Email 1: The Observation

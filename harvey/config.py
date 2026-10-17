@@ -187,6 +187,7 @@ class QuietHoursConfig(BaseModel):
 
 class UsageConfig(BaseModel):
     max_daily_claude_percent: float = 80.0
+    max_daily_provider_percent: float | None = None
     heartbeat_interval_minutes: int = 15
     quiet_hours: QuietHoursConfig = QuietHoursConfig()
 
@@ -197,6 +198,21 @@ class UsageConfig(BaseModel):
             raise ValueError("max_daily_claude_percent must be between 0 and 100")
         return v
 
+    @field_validator("max_daily_provider_percent")
+    @classmethod
+    def _valid_provider_percent(cls, v: float | None) -> float | None:
+        if v is not None and not 0 < v <= 100:
+            raise ValueError("max_daily_provider_percent must be between 0 and 100")
+        return v
+
+    @model_validator(mode="after")
+    def _sync_provider_percent(self):
+        if self.max_daily_provider_percent is not None:
+            self.max_daily_claude_percent = self.max_daily_provider_percent
+        else:
+            self.max_daily_provider_percent = self.max_daily_claude_percent
+        return self
+
     @field_validator("heartbeat_interval_minutes")
     @classmethod
     def _valid_interval(cls, v: int) -> int:
@@ -205,7 +221,7 @@ class UsageConfig(BaseModel):
         return v
 
 
-BRAIN_PROVIDERS = ("claude", "codex")
+BRAIN_PROVIDERS = ("claude", "codex", "antigravity")
 CODEX_REASONING_EFFORTS = ("minimal", "low", "medium", "high", "xhigh")
 
 # Model names are passed to a CLI, so they must look like a model name and
@@ -216,10 +232,11 @@ _MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,127}$")
 class BrainConfig(BaseModel):
     """Which subscription Harvey thinks with.
 
+    ``antigravity`` runs Google Antigravity (agy) headless on your Gemini plan.
     ``claude`` (default) runs Claude Code headless on your Claude plan.
     ``codex`` runs Codex on your ChatGPT plan. There is never an automatic
     fallback between them, and an explicit ``model`` only affects Harvey —
-    your own Claude Code / Codex settings are never read or changed.
+    your own Claude Code / Codex / agy settings are never read or changed.
     """
 
     provider: str = "claude"

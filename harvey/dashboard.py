@@ -555,10 +555,11 @@ async def get_stats():
         action_count = actions[0]["count"] if actions else 0
 
         usage = await query_db(
-            "SELECT claude_calls, codex_calls FROM usage_log WHERE date = date('now')"
+            "SELECT claude_calls, codex_calls, antigravity_calls FROM usage_log WHERE date = date('now')"
         )
         usage_today = (usage[0]["claude_calls"] or 0) if usage else 0
         codex_today = (usage[0]["codex_calls"] or 0) if usage else 0
+        antigravity_today = (usage[0]["antigravity_calls"] or 0) if usage else 0
 
         return {
             "prospects": {"total": prospect_total, "by_status": prospect_map},
@@ -567,6 +568,7 @@ async def get_stats():
             "actions_total": action_count,
             "claude_calls_today": usage_today,
             "codex_calls_today": codex_today,
+            "antigravity_calls_today": antigravity_today,
             "brain_provider": _active_provider(),
             "brain_status": await _brain_status(),
         }
@@ -619,6 +621,9 @@ def _quota_client_for(provider: str, model: str = ""):
         if provider == "codex":
             from harvey.codex import CodexClient, CodexQuotaClient
             _quota_clients[key] = CodexQuotaClient(CodexClient(model=model))
+        elif provider == "antigravity":
+            from harvey.antigravity import AntigravityProvider, AntigravityQuotaClient
+            _quota_clients[key] = AntigravityQuotaClient(AntigravityProvider(model=model))
         elif provider == "claude":
             from harvey.integrations.quota import QuotaClient
             _quota_clients[key] = QuotaClient()

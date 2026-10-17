@@ -87,12 +87,13 @@ async def _test_claude(brain: Brain) -> bool:
 
 
 def _ask_brain_config() -> BrainConfig:
-    """Ask which subscription Harvey thinks with. Claude is the default."""
+    """Ask which subscription Harvey thinks with."""
     _print_harvey("I think with an AI subscription you already pay for:")
-    print("    claude — your Claude plan, via Claude Code (default)")
-    print("    codex  — your ChatGPT plan, via the Codex CLI")
+    print("    antigravity — your Google Antigravity plan, via the agy CLI (recommended)")
+    print("    claude      — your Claude plan, via Claude Code")
+    print("    codex       — your ChatGPT plan, via the Codex CLI")
     while True:
-        provider = _ask("Which one? (claude/codex)", default="claude").lower()
+        provider = _ask("Which one? (antigravity/claude/codex)", default="antigravity").lower()
         if provider == "codex":
             from harvey.codex import CodexError, require_supported_platform
             try:
@@ -100,9 +101,9 @@ def _ask_brain_config() -> BrainConfig:
             except CodexError as e:
                 print(f"    ({e})")
                 continue
-        if provider in ("claude", "codex"):
+        if provider in ("antigravity", "claude", "codex"):
             break
-        print("    (type claude or codex)")
+        print("    (type antigravity, claude, or codex)")
     if provider == "codex":
         from harvey.codex import SUGGESTED_MODEL
         print(f"    {SUGGESTED_MODEL} is the Codex model Harvey has verified as text-only")
@@ -190,8 +191,36 @@ class SetupWizard:
         self.brain_config = _ask_brain_config()
         if self.brain_config.provider == "codex":
             await self._check_codex()
+        elif self.brain_config.provider == "antigravity":
+            await self._check_antigravity()
         else:
             await self._check_claude()
+
+    async def _check_antigravity(self):
+        from harvey.antigravity import AntigravityProvider
+        provider = AntigravityProvider(model=self.brain_config.model)
+        print("\n  Checking Antigravity CLI (agy)...", end=" ")
+        if shutil.which(provider.resolve_agy()):
+            print("✓ Found")
+        else:
+            print("✗ Not found")
+            _print_harvey("I need Google Antigravity CLI ('agy') to think.")
+            print("         Please ensure agy is installed and available in PATH.")
+            if not _ask_yes_no("Continue anyway?", default=False):
+                raise SystemExit(1)
+
+        print("  Testing Antigravity (isolated, no tools)...", end=" ", flush=True)
+        state = StateManager()
+        await state.init_db()
+        brain = Brain(state, self.brain_config)
+        if await _test_claude(brain):
+            print("✓ Working")
+        else:
+            print("✗ Failed (or agy not logged in)")
+            _print_harvey("Antigravity test call did not succeed.")
+            if not _ask_yes_no("Continue anyway?", default=False):
+                raise SystemExit(1)
+        self._check_python_packages()
 
     async def _check_claude(self):
         # Check Claude CLI

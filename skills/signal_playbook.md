@@ -46,6 +46,18 @@ product in their actual stack, or to point at a gap.
   scraped). Reference at most one tool, and only if it's load-bearing to
   the point.
 
+### Incumbent Agency Signal (Footer Credits)
+When profiling a company's website, footer agency credits disclose their web design or marketing partner.
+Because naming the wrong incumbent in an outreach email is worse than saying nothing at all, Harvey uses strict confidence thresholds:
+
+- **0.90 (Strong Credit)**: Context text explicitly indicates attribution. E.g. "Powered by", "Website by", "Site by", "Web design by", "Designed by", "Developed by", "Built by", "Created by", "Marketing by".
+- **0.75 (Descriptive Credit)**: Anchor text explicitly names agency services. E.g. "web design", "website design", "digital marketing", "seo", "marketing agency", "web development".
+- **<0.35 (Bare Link - Ignored)**: Bare links without explicit attribution context or descriptive services are below the recording floor (`RECORD_FLOOR = 0.75`) and are strictly ignored.
+
+**Angle:**
+- **Good**: "Noticed {{agency}} built your current site. How has that been working out for conversion?"
+- **Bad**: Guessing or assuming agency relationship without verified footer credit score >= 0.75.
+
 ### Funding signal (recent raise)
 60-90 days post-raise is peak buying window. But everyone emails post-raise
 companies, so the bar for specificity is higher.
@@ -67,10 +79,10 @@ businesses.
 
 ## Which signal wins when there are several
 
-Rank by recency and actionability: **hiring > funding > tech-gap >
-tech-present > industry problem > nothing**. Use exactly ONE signal as the
-hook. Stacking two ("you raised AND you're hiring AND you use X") reads as a
-dossier and kills the human feel. Bank the others for follow-ups.
+Rank by recency and actionability:
+**hiring > funding > tech-gap > tech-present > incumbent-agency > industry problem > nothing**.
+
+Use exactly ONE signal as the hook. Stacking two ("you raised AND you're hiring AND you use X") reads as a dossier and kills the human feel. Bank the others for follow-ups.
 
 ## Following up on a signal
 

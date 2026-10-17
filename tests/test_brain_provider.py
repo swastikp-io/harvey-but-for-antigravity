@@ -68,7 +68,9 @@ def test_load_brain_config(tmp_path):
     assert load_brain_config(str(path)).provider == "claude"  # no section
     path.write_text(yaml.dump({"brain": {"provider": "codex", "model": "gpt-5.5"}}))
     assert load_brain_config(str(path)) == BrainConfig(provider="codex", model="gpt-5.5")
-    path.write_text(yaml.dump({"brain": {"provider": "gemini"}}))
+    path.write_text(yaml.dump({"brain": {"provider": "antigravity", "model": "gemini-3.8-flash"}}))
+    assert load_brain_config(str(path)) == BrainConfig(provider="antigravity", model="gemini-3.8-flash")
+    path.write_text(yaml.dump({"brain": {"provider": "unknown_provider"}}))
     with pytest.raises(ConfigError):  # never silently becomes Claude
         load_brain_config(str(path))
 
@@ -366,9 +368,9 @@ async def test_existing_usage_rows_become_claude(tmp_path):
     assert await sm.get_usage_today("codex") == 0
     summary = await sm.get_state_summary()
     assert summary["usage_today"] == 7
-    assert summary["usage_today_by_provider"] == {"claude": 7, "codex": 0}
+    assert summary["usage_today_by_provider"] == {"claude": 7, "codex": 0, "antigravity": 0}
     with pytest.raises(ValueError):
-        await sm.record_usage_event(provider="gemini")
+        await sm.record_usage_event(provider="unknown_provider")
 
 
 # ── training and setup preserve the selection ──
