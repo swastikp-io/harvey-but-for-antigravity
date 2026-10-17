@@ -1,4 +1,4 @@
-# Harvey
+# harvey but for antigravity
 
 **An autonomous sales agent built for Google Antigravity (`agy`).**
 
