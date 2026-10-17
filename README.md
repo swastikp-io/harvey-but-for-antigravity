@@ -1,4 +1,4 @@
-# Harvey
+# harvey but for antigravity
 
 **An autonomous sales agent that runs on your Google Antigravity (`agy`), Claude Code, or Codex subscription.**
 
